@@ -39,7 +39,8 @@ install(PROGRAMS
   scripts/telemetry/telematics.py
   scripts/debug/debug_steer.py
   scripts/debug/set_steer.py
-  scripts/estimation/ukf_node.py
+  scripts/estimation/nand_estimator.py
+  scripts/estimation/steer_offset_estimator.py
   scripts/vision/detector_node.py
   DESTINATION lib/${PROJECT_NAME}
 )

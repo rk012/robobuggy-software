@@ -5,7 +5,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Float32, Bool
+from std_msgs.msg import Float32, Bool, Float64
 from nav_msgs.msg import Odometry
 from buggy.msg import TrajectoryMsg, StampedFloat64Msg
 
@@ -38,7 +38,11 @@ class Controller(Node):
 
         self.declare_parameter("stateTopic", "self/state")
         self.declare_parameter("steeringTopic", "input/steering")
+        self.declare_parameter("rawSteeringTopic", "input/steering_raw")
         self.declare_parameter("trajectoryTopic", "self/cur_traj")
+        self.declare_parameter("offsetTopic", "self/steer_offset")
+        self.declare_parameter("useSteerOffset", False)
+        self.use_steer_offset = self.get_parameter("useSteerOffset").value
 
         start_index = self.cur_traj.get_index_from_distance(start_dist)
 
@@ -64,6 +68,9 @@ class Controller(Node):
         self.steer_publisher = self.create_publisher(
             StampedFloat64Msg, self.get_parameter("steeringTopic").value, 1
         )
+        self.steer_raw_publisher = self.create_publisher(
+            StampedFloat64Msg, self.get_parameter("rawSteeringTopic").value, 1
+        )
         self.heading_publisher = self.create_publisher(
             Float32, "debug/heading", 1
         )
@@ -71,9 +78,11 @@ class Controller(Node):
         # Subscribers
         self.odom_subscriber = self.create_subscription(Odometry, self.get_parameter("stateTopic").value, self.odom_listener, 1)
         self.traj_subscriber = self.create_subscription(TrajectoryMsg, self.get_parameter("trajectoryTopic").value, self.traj_listener, 1)
+        self.steer_offset_subscriber = self.create_subscription(Float64, self.get_parameter("offsetTopic").value, self.offset_listener, 1)
 
         self.odom = None
         self.passed_init = False
+        self.steer_offset : float = 0.0
 
         timer_period = 0.01  # seconds (100 Hz)
         self.timer = self.create_timer(timer_period, self.loop)
@@ -90,6 +99,12 @@ class Controller(Node):
         This is the subscriber that updates the buggies trajectory for navigation
         '''
         self.cur_traj, self.controller.current_traj_index = Trajectory.unpack(msg)
+
+    def offset_listener(self, msg):
+        '''
+        This is the subscriber that updates the steer offset, from offset_estimator.py
+        '''
+        self.steer_offset = np.deg2rad(msg.data)
 
     def init_check(self):
         """
@@ -141,9 +156,16 @@ class Controller(Node):
                 return
 
         odom = self.odom
-
         self.heading_publisher.publish(Float32(data=np.rad2deg(odom.pose.pose.orientation.z)))
+
         steering_angle = self.controller.compute_control(odom, self.cur_traj)
+
+        steering_angle_raw_deg = np.rad2deg(steering_angle)
+        self.steer_raw_publisher.publish(StampedFloat64Msg(header=odom.header, data=float(steering_angle_raw_deg.item())))
+
+        if self.use_steer_offset:
+            steering_angle -= self.steer_offset
+
         steering_angle_deg = np.rad2deg(steering_angle)
         self.steer_publisher.publish(StampedFloat64Msg(header=odom.header, data=float(steering_angle_deg.item())))
 

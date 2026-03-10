@@ -43,8 +43,12 @@ class Detector(Node):
         self.initialize_camera()
         self.raw_image = sl.Mat()
         self.objects = sl.Objects()
+
+        self.model = YOLO("src/buggy/scripts/vision/trained-models/01-15-25_no_pushbar_yolov11n.pt")
+
         self.runtime_params = sl.RuntimeParameters()
         self.object_det_params = sl.ObjectDetectionRuntimeParameters()
+
         self.bridge = CvBridge()
 
         # Subscribers
@@ -69,7 +73,11 @@ class Detector(Node):
         timer_period = 0.1
         self.timer = self.create_timer(timer_period, callback=self.loop)
 
+        # while rclpy.ok():
+        #     self.loop()
+
     def set_SC_state(self, msg):
+        # TODO: does this need locking to prevent conflict with object detection? --> probably not, but needs to be tested
         self.SC_pose = msg.pose.pose
         self.get_logger().debug("SC state received: " + str(self.SC_pose.position))
 
@@ -77,7 +85,7 @@ class Detector(Node):
         init_params = sl.InitParameters(svo_real_time_mode=True)
         positional_tracking_params = sl.PositionalTrackingParameters()
         obj_params = sl.ObjectDetectionParameters()
-        recording_params = sl.RecordingParameters(self.svo_file_path, sl.SVO_COMPRESSION_MODE.H264)
+        # recording_params = sl.RecordingParameters(self.svo_file_path, sl.SVO_COMPRESSION_MODE.H264)
 
         init_params.coordinate_units = sl.UNIT.METER
         init_params.depth_mode = sl.DEPTH_MODE.ULTRA  # QUALITY
@@ -92,17 +100,19 @@ class Detector(Node):
         obj_params.enable_tracking = True
         obj_params.enable_segmentation = False  # designed to give person pixel mask
 
+        # TODO: is exiting a node this way safe? will it interfere with other operation? (might need to test by trying to run node without camera plugged in)
+        # --> changed from exit(1) to destroy_node(), still needs to be tested
         status = self.cam.open(init_params)
         if status != sl.ERROR_CODE.SUCCESS:
-            self.get_logger().error("Camera Couldn't Open", status, "Exiting program.")
-            raise Exception("Camera Failed to Open")
+            self.get_logger().error("Camera Open", status, "Exiting program.")
+            self.destroy_node()
+            rclpy.shutdown()
 
         self.cam.enable_positional_tracking(positional_tracking_params)
         self.cam.enable_object_detection(obj_params)
-        self.cam.enable_recording(recording_params)
 
     def detections_to_custom_box(self, detections, im0):
-        def xywh2abcd(xywh, _im_shape):
+        def xywh2abcd(xywh, _):
             output = np.zeros((4, 2))
 
             # Center / Width / Height -> BBox corners coordinates
@@ -142,6 +152,9 @@ class Detector(Node):
         return output
 
     def objects_to_utm(self):
+        # TODO: MOVE TO CONSTANTS FILE
+        CAMERA_OFFSET = 0.6  # Distance from INS to camera in meters
+
         buggy_position = self.SC_pose.position
         buggy_orientation = self.SC_pose.orientation
 
@@ -156,7 +169,7 @@ class Detector(Node):
             vec = rot.apply(
                 np.array(
                     [
-                        detection_position[0] + self.CAMERA_OFFSET,
+                        detection_position[0] + CAMERA_OFFSET,
                         detection_position[1],
                         detection_position[2],
                     ]
@@ -184,13 +197,14 @@ class Detector(Node):
             image_net = self.raw_image.get_data()
 
             # get raw frame
-            raw_image_np = cv2.cvtColor(image_net, cv2.COLOR_RGBA2RGB)
+            raw_image_np = cv2.cvtColor(image_net, cv2.COLOR_BGRA2BGR)
+            # raw_frame_publish = self.bridge.cv2_to_imgmsg(raw_image_np, encoding="rgb8")
 
             # pass frame into YOLO model (get 2D)
-            detections = self.model.predict(raw_image_np, save=False, verbose=False)
+            detections = self.model.predict(raw_image_np, save=False)
             detection_boxes = (
                 detections[0].cpu().numpy().boxes
-            )
+            )  # what is the [0] indexing into, does this pull out the first detection?
             custom_boxes = self.detections_to_custom_box(detection_boxes, image_net)
 
             # pass into 2D to 3D to get approximate depth

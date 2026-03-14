@@ -169,6 +169,10 @@ class Translator(Node):
                 odom.pose.pose.position.y = packet.northing
                 odom.pose.pose.orientation.z = packet.theta
 
+                # Updated the eastern, northing, and heading (yaw) index of variance
+                # Important note: covariance operates on (x, y, z, pitch, roll, yaw)
+                odom.pose.covariance = np.diag([packet.eastern_cov, packet.northern_cov, 0, 0, 0, packet.heading_cov]).reshape(-1).tolist()
+
                 self.nandCircArray[self.nandIndex] = packet.velocity
                 self.nandIndex = (self.nandIndex + 1) % self.CIRCLEN
                 odom.twist.twist.linear.x = np.mean(self.nandCircArray)

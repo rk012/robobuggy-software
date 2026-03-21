@@ -189,9 +189,11 @@ class Translator(Node):
                 rospacket.easting = packet.easting
                 rospacket.northing = packet.northing
                 rospacket.accuracy = packet.accuracy
-                rospacket.gps_time = packet.gps_time
                 rospacket.gps_seqnum = packet.gps_seqnum
+                rospacket.timestamp = packet.timestamp
+                rospacket.gps_siv = packet.gps_SIV
                 rospacket.gps_fix = packet.gps_fix
+                rospacket.rtk_fix = packet.rtk_fix
                 self.nand_raw_gps_publisher.publish(rospacket)
 
                 self.get_logger().debug(f'NAND Raw GPS Timestamp: {packet.timestamp}')

@@ -116,12 +116,14 @@ class NANDRawGPS:
     northing: float # double
     # this is a 2D accuracy value
     accuracy: float # double
-    gps_time: int # uint64
     # 32 bits
     gps_seqnum: int
     timestamp: int
     # 8 bits
+    gps_SIV: int #uint8
     gps_fix: int # uint8
+    rtk_fix: int
+
 
 @dataclass
 class Radio:
@@ -278,7 +280,7 @@ class Comms:
             return NANDUKF(*data)
 
         elif msg_type == MSG_TYPE_NAND_GPS:
-            data = struct.unpack('<dddQIIBxxxxxxx', payload)
+            data = struct.unpack('<dddIIBBBxxxxx', payload)
             return NANDRawGPS(*data)
 
         elif msg_type == MSG_TYPE_RADIO:

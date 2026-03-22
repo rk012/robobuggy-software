@@ -1,6 +1,6 @@
 /**: # Global Params
   ros__parameters:
-      traj_name: "buggycourse_safe.json"
+      traj_name: "buggycourse_sc.json"
 
 SC:
   bnyahaj:
@@ -18,7 +18,6 @@ SC:
       useSteerOffset: true 
       useHeadingRate: true
       controllerName: "controller"
-      # traj_name: "buggycourse_safe.json"
       controller: "stanley"
 
   SC_offset_estimator:
@@ -34,14 +33,14 @@ SC:
       trajectoryTopic: "other/cur_traj"
       steeringTopic: "other/steering"
       rawSteeringTopic: "other/steering_raw"
+      useSteerOffset: false
       useHeadingRate: false
       controllerName: "NAND_controller"
-      traj_name: "buggycourse_safe.json"
+      traj_name: "buggycourse_nand.json"
       controller: "stanley"
 
   SC_path_planner:
     ros__parameters:
-      # traj_name: "buggycourse_safe.json"
       curb_name: "buggycourse_curb.json"
 
   SC_vision:

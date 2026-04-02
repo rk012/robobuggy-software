@@ -16,7 +16,7 @@ rb_ws/rosbag2*/
 .vision/
 vision/data/
 
-#VENV
+# VENV
 .sc/
 .nand/
 .venv/
@@ -26,5 +26,5 @@ build/
 install/
 log/
 
-# QUIT
+# MAP FILES
 *.png

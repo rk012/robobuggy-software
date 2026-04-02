@@ -41,6 +41,7 @@ class Controller(Node):
         self.cur_traj = Trajectory(json_filepath=os.environ["TRAJPATH"] + traj_name)
         start_index = self.cur_traj.get_index_from_distance(start_dist)
         self.declare_parameter("useHeadingRate", True)
+        self.declare_parameter("debugHeadingTopic", "debug/heading")
 
         self.declare_parameter("controllerName", "controller")
         self.declare_parameter("controller", "stanley")
@@ -65,7 +66,7 @@ class Controller(Node):
             StampedFloat64Msg, self.get_parameter("rawSteeringTopic").value, 1
         )
         self.heading_publisher = self.create_publisher(
-            Float32, "debug/heading", 1
+            Float32, self.get_parameter("debugHeadingTopic").value, 1
         )
 
         # Subscribers

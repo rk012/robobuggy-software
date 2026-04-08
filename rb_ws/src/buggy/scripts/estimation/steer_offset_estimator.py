@@ -136,6 +136,10 @@ class SteerOffsetEstimator(Node):
         self.debug = None   # not used currently, can be used to pass debug info from utils to publish topics
         self.last_time = None
 
+        self.ukf_converged = False
+        if hasattr(self, "lowPassFilter"):
+            self.lowPassFilter.reset()
+
     def firmware_debug_callback(self, msg):
         """
         Handle debug/firmware messages to enable/disable and re-init the estimator.
@@ -186,7 +190,8 @@ class SteerOffsetEstimator(Node):
                 msg.pose.pose.position.y,
                 msg.pose.pose.orientation.z,
                 msg.twist.twist.linear.x,
-                0])
+                0
+            ])
 
         # measurement vector
         y = [msg.pose.pose.position.x, msg.pose.pose.position.y]
@@ -213,7 +218,18 @@ class SteerOffsetEstimator(Node):
             return
 
         time_delta = 0.01 if not self.last_time else time.time() - self.last_time
-        self.x_hat, self.Sigma, self.singular_flag = ukf_utils.ukf_predict(self.rk4_dynamics, self.x_hat, self.Sigma, self.Sigma_init, self.Q, [self.steering], time_delta, [self.wheelbase])
+        self.x_hat, self.Sigma, self.singular_flag = (
+            ukf_utils.ukf_predict(
+                self.rk4_dynamics,
+                self.x_hat,
+                self.Sigma,
+                self.Sigma_init,
+                self.Q,
+                [self.steering],
+                time_delta,
+                [self.wheelbase]
+            )
+        )
         self.x_hat[2] = self.wrap_angle(self.x_hat[2], np.pi)     # wrap heading
         self.x_hat[4] = self.wrap_angle(self.x_hat[4], np.pi/2)   # wrap steer offset
         self.last_time = time.time()
@@ -232,7 +248,11 @@ class SteerOffsetEstimator(Node):
         offset_variance = self.Sigma[-1, -1]
 
         # Checks the offset variance is reasonable, corresponds to 6 deg std deviation.
-        if offset_variance < Constants.OFFSET_THRESHOLD:
+        if offset_variance < Constants.OFFSET_DIVERGENCE_THRESHOLD:
+            if (not self.ukf_converged and
+                    offset_variance < Constants.OFFSET_CONVERGENCE_THRESHOLD):
+                self.get_logger().info("Steer Offset UKF converged!")
+                self.ukf_converged = True
 
             # wrap the steering offset to (-pi/2, pi/2]
             steer_offset = np.rad2deg(self.wrap_angle(self.x_hat[4], np.pi/2))
@@ -241,6 +261,13 @@ class SteerOffsetEstimator(Node):
             # apply low-pass filter to steering offset
             steer_offset_filtered = self.lowPassFilter.update(steer_offset)
             self.offset_publisher_filtered.publish(Float64(data=steer_offset_filtered))
+        elif self.ukf_converged:
+            self.get_logger().warn(
+                f"WARNING: Steer Offset Estimator UKF diverged! "
+                f"Current Covariance: {self.Sigma} "
+            )
+            self.get_logger().info("Reinitializing UKF")
+            self.reset_filter()
 
 
 

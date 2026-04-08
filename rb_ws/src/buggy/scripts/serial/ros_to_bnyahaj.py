@@ -154,11 +154,13 @@ class Translator(Node):
                 rospacket.software_steering_angle = packet.software_steering_angle
                 rospacket.true_steering_angle = packet.true_steering_angle
                 rospacket.rfm69_timeout_num = packet.rfm69_timeout_num
+                rospacket.encoder_last_packet = packet.encoder_last_packet
                 rospacket.operator_ready = packet.operator_ready
                 rospacket.brake_status = packet.brake_status
                 rospacket.auton_steer = packet.auton_steer
                 rospacket.tx12_state = packet.tx12_state
                 rospacket.stepper_alarm = packet.stepper_alarm
+                rospacket.encoder_error = packet.encoder_error
                 rospacket.rc_uplink_quality = packet.rc_uplink_quality
                 self.nand_debug_info_publisher.publish(rospacket)
 

@@ -86,11 +86,13 @@ class NANDDebugInfo:
     software_steering_angle: float
     true_steering_angle: float
     rfm69_timeout_num: int
+    encoder_last_packet: int # ms since packet
     # 8 bits
     operator_ready: bool
     brake_status: bool
     auton_steer: bool
     tx12_state: bool
+    encoder_error: int
     stepper_alarm: int # unsigned char
     rc_uplink_quality: int # uint8
 
@@ -272,7 +274,7 @@ class Comms:
 
         msg_type, payload = packet
         if msg_type == MSG_TYPE_NAND_DEBUG:
-            data = struct.unpack('<ddIfffI????BBxxxxxx', payload)
+            data = struct.unpack('<ddIfffII????BBBx', payload)
             return NANDDebugInfo(*data)
 
         elif msg_type == MSG_TYPE_NAND_UKF:

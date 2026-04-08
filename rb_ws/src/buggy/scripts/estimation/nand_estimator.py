@@ -195,7 +195,7 @@ class NANDStateEstimator(Node):
                     self.init_ukf()
                     return
 
-            elif (np.any(pose_var < Constants.NAND_UKF_POSE_CONVERGENCE_THRESHOLD)
+            elif (np.all(pose_var < Constants.NAND_UKF_POSE_CONVERGENCE_THRESHOLD)
                     or twist_var < Constants.NAND_UKF_TWIST_CONVERGENCE_THRESHOLD) and not self.ukf_converged:
                 self.get_logger().info("NAND State UKF converged!")
                 self.ukf_converged = True

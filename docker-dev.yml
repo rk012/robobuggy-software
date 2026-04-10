@@ -1,6 +1,7 @@
 services:
   main:
     build: ./
+    stop_signal: SIGKILL # Instant shutdown
     volumes:
       - ./rb_ws:/rb_ws
       - "${RLSENSE_PORT:-/dev/null}:/dev/bus/usb"
@@ -19,7 +20,6 @@ services:
     ports:
       - "0.0.0.0:8765:8765" # foxglove bridge
       - "0.0.0.0:8760:8760" # Asset server for loading stuff into foxglove
-    platform: "linux/amd64"
     device_cgroup_rules:
       - "c *:* rmw"
   tileserver:

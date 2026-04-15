@@ -80,7 +80,8 @@ class VelocityUpdater(Node):
             dist = math.sqrt((x-self.position.x)**2 + (y-self.position.y)**2)
             self.debug_dist = dist
             if dist < r:
-                self.buggy_vel = v
+                if not f:
+                    self.buggy_vel = v
                 self.free_roll = f
                 break
 

@@ -1,6 +1,13 @@
 {
     "checkpoints": [
         {
+            "x-pos": 589708.2967650741,
+            "y-pos": 4477167.443984188,
+            "radius": 20,
+            "velocity": 17,
+            "free-roll": false
+        },
+        {
             "x-pos": 589685,
             "y-pos": 4477153,
             "radius": 20,

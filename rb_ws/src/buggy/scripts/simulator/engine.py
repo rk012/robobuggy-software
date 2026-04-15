@@ -7,7 +7,7 @@ import rclpy
 from buggy.msg import StampedFloat64Msg
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Twist, PoseWithCovariance, TwistWithCovariance
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Bool
 from sensor_msgs.msg import NavSatFix
 from nav_msgs.msg import Odometry
 import numpy as np
@@ -51,10 +51,17 @@ class Simulator(Node):
         self.declare_parameter('velocity', 12.0)
         self.velocity = self.get_parameter("velocity").value
 
+        self.is_freeroll = False
+
         self.declare_parameter('steering_offset', 0.0)
         self.declare_parameter('steering_offset_func', 'constant')
         self.declare_parameter('steering_offset_period', 10.0)
         self.declare_parameter('edata', 'course_cut_square.csv')
+
+        # Physical constants
+        # TODO - set as params and/or move to constants
+        self.mass = 58.967  # kg
+        self.moment_of_inertia = 21.847274476  # kg, m, ellipsoid + ballpark measurement
 
         emap_name = self.get_parameter("edata").value
         emap_path = os.environ["EDATAPATH"] + emap_name
@@ -119,6 +126,10 @@ class Simulator(Node):
             Float64, "sim/velocity", self.update_velocity, 1
         )
 
+        self.simstate_subscriber = self.create_subscription(
+            Bool, "sim/freeroll", self.update_simstate, 1
+        )
+
         # simulate the INS's outputs (noise included)
         # this is published as a BuggyState (UTM and radians)
         self.pose_publisher = self.create_publisher(Odometry, "self/state", 1)
@@ -138,7 +149,26 @@ class Simulator(Node):
     def apply_delayed_steering(self):
         """Precondition: lock must be held when calling this function"""
         # the delayed steering is at the front of the buffer
-        self.current_steering = self.steering_buffer[0]
+        cur_steer = self.current_steering
+        new_steer = self.steering_buffer[0]
+
+        self.current_steering = new_steer
+        if not self.is_freeroll:
+            return
+
+        offset = self.steering_offset_value(self.sim_time)
+
+        # In freeroll, adjust velocity to preserve kinetic energy
+        def f(d):
+            # v^2 factor
+            return self.mass + (self.moment_of_inertia / self.wheelbase ** 2) * (np.tan(d) ** 2)
+
+        v = self.velocity
+        d = (cur_steer + offset) * np.pi / 180.0
+        E = v*v*f(d)
+
+        d = (new_steer + offset) * np.pi / 180
+        self.velocity = np.sqrt(E / f(d))
 
     def steering_offset_value(self, sim_time: float) -> float:
         if self.steering_offset_func == "sin":
@@ -148,7 +178,13 @@ class Simulator(Node):
 
     def update_velocity(self, data: Float64):
         with self.lock:
-            self.velocity = data.data
+            # Ignore velocity updates while in freeroll
+            if not self.is_freeroll:
+                self.velocity = data.data
+    
+    def update_simstate(self, is_freeroll: Bool):
+        with self.lock:
+            self.is_freeroll = is_freeroll.data
 
     def dynamics(self, state, v):
         l = self.wheelbase

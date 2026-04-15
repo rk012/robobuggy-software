@@ -41,7 +41,7 @@ def main():
     track_path = Path(polygon_vertices)
 
     print("Initializing EMap (building triangulation)...")
-    emap = EMap(args.csv_path)
+    emap = EMap(args.csv_path, inner_points, outer_points)
 
     print("Generating dense elevation grid...")
     min_x, max_x = np.min(polygon_vertices[:, 0]), np.max(polygon_vertices[:, 0])

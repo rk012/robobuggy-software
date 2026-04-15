@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import json
 import os
 import threading
 import time
@@ -63,9 +64,30 @@ class Simulator(Node):
         self.mass = 58.967  # kg
         self.moment_of_inertia = 21.847274476  # kg, m, ellipsoid + ballpark measurement
 
+        # TODO - params to specify boundary path
+        def load_json_to_utm(filepath):
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            utm_points = []
+            for pt in data:
+                lat = pt['lat']
+                lon = pt['lon']
+                easting, northing, _, _ = utm.from_latlon(lat, lon, force_zone_number=Constants.UTM_ZONE_NUM)
+                utm_points.append([easting, northing])
+                
+            return np.array(utm_points)
+        
+        course_name = "paths/buggycourse"
+        outer_file = f"{course_name}_outer.json"
+        inner_file = f"{course_name}_inner.json"
+
+        outer_points = load_json_to_utm(outer_file)
+        inner_points = load_json_to_utm(inner_file)
+
         emap_name = self.get_parameter("edata").value
         emap_path = os.environ["EDATAPATH"] + emap_name
-        self.emap = EMap(emap_path)
+        self.emap = EMap(emap_path, inner_points, outer_points)
 
         self.steering_offset = self.get_parameter("steering_offset").value
         self.steering_offset_func = str(self.get_parameter("steering_offset_func").value).lower()
@@ -186,24 +208,37 @@ class Simulator(Node):
         with self.lock:
             self.is_freeroll = is_freeroll.data
 
-    def dynamics(self, state, v):
+    def dynamics(self, state):
         l = self.wheelbase
-        _, _, theta, delta, delta0 = state
+        m = self.mass
+        I = self.moment_of_inertia
+        x, y, theta, v, delta, delta0 = state
+
+        d = delta + delta0
+
+        dv = 0
+
+        if self.is_freeroll:
+            # gravity - assumes CoM is in back axle for now
+            g = 9.807
+            M = m / (m + (I / (l*l))*(np.tan(d) ** 2))
+            t = np.array([np.cos(theta), np.sin(theta)])
+            dv = -M * g * np.dot(t, self.emap.grad(x, y))
 
         return np.array([v * np.cos(theta),
                          v * np.sin(theta),
-                         v / l * np.tan(delta + delta0),
+                         v / l * np.tan(d),
+                         dv,
                          0, 0])
 
     def step(self):
-
         with self.lock:
             heading = self.heading
             e_utm = self.e_utm
             n_utm = self.n_utm
-            velocity = self.velocity
 
             self.apply_delayed_steering()
+            velocity = self.velocity
             steering_angle = self.current_steering
             sim_time = self.sim_time
             steering_offset_deg = self.steering_offset_value(sim_time)
@@ -214,25 +249,27 @@ class Simulator(Node):
             e_utm,
             n_utm,
             np.deg2rad(heading),
+            velocity,
             np.deg2rad(steering_angle),
             np.deg2rad(steering_offset_deg),
         ])
-        k1 = self.dynamics(state, velocity)
-        k2 = self.dynamics(state + h/2 * k1, velocity)
-        k3 = self.dynamics(state + h/2 * k2, velocity)
-        k4 = self.dynamics(state + h * k3, velocity)
+        k1 = self.dynamics(state)
+        k2 = self.dynamics(state + h/2 * k1)
+        k3 = self.dynamics(state + h/2 * k2)
+        k4 = self.dynamics(state + h * k3)
 
         final_state = state + h/6 * (k1 + 2 * k2 + 2 * k3 + k4)
         final_state[0] += np.random.normal(0, self.process_noise_std)
         final_state[1] += np.random.normal(0, self.process_noise_std)
 
-        e_utm_new, n_utm_new, heading_new, _, _ = final_state
+        e_utm_new, n_utm_new, heading_new, velocity_new, _, _ = final_state
         heading_new = np.rad2deg(heading_new)
 
         with self.lock:
             self.e_utm = e_utm_new
             self.n_utm = n_utm_new
             self.heading = heading_new
+            self.velocity = velocity_new
             self.sim_time = sim_time + h
 
     def publish(self):

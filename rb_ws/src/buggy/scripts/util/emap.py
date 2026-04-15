@@ -13,6 +13,7 @@ class EMap:
         # LinearNDInterpolator naturally handles unstructured data and missing points.
         # It takes a moment to build the triangulation, but queries are extremely fast.
         points = np.column_stack((self.X, self.Y))
+        print(f"Building elevation map from {len(points)} points")
         self._interpolator = LinearNDInterpolator(points, self.Z)
 
     def elevation(self, x, y):

@@ -7,7 +7,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Point
-from std_msgs.msg import Float64
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64, Bool
 
 class VelocityUpdater(Node):
     RATE = 100
@@ -34,34 +35,37 @@ class VelocityUpdater(Node):
 
         # initialize variables
         self.buggy_vel = self.init_vel
+        self.free_roll = False
         self.debug_dist = 0
 
         self.position = Point()
         self.lock = threading.Lock()
 
-        # subscribe sim_2d/utm for position values
+        # subscribe for position values
         self.pose_subscriber = self.create_subscription(
-            Pose,
-            "sim_2d/utm",
+            Odometry,
+            "self/state",
             self.update_position,
             1
         )
 
         # publish velocity to "sim/velocity"
         self.velocity_publisher = self.create_publisher(Float64, "sim/velocity", 1)
+        self.sim_state_publisher = self.create_publisher(Bool, "sim/freeroll", 1)
 
         # ROS2 timer for stepping
         self.timer = self.create_timer(1.0 / self.RATE, self.step)
 
-    def update_position(self, new_pose: Pose):
+    def update_position(self, new_pose: Odometry):
         '''Callback function to update internal position variable when new
         buggy position is published
 
         Args:
-            new_pose (Pose): Pose object from topic
+            new_pose (Odometry): Odometry object from topic
         '''
+
         with self.lock:
-            self.position = new_pose.position
+            self.position = new_pose.pose.pose.position
 
     def check_velocity(self):
         '''Check if the position of the buggy is in any of the checkpoints set
@@ -72,11 +76,14 @@ class VelocityUpdater(Node):
             y = checkpoint["y-pos"]
             r = checkpoint["radius"]
             v = checkpoint["velocity"]
+            f = checkpoint["free-roll"]
             dist = math.sqrt((x-self.position.x)**2 + (y-self.position.y)**2)
             self.debug_dist = dist
             if dist < r:
                 self.buggy_vel = v
+                self.free_roll = f
                 break
+
 
     def step(self):
         '''Update velocity of buggy for one timestep
@@ -89,6 +96,10 @@ class VelocityUpdater(Node):
         float_64_velocity = Float64()
         float_64_velocity.data = float(self.buggy_vel)
         self.velocity_publisher.publish(float_64_velocity)
+
+        free_roll = Bool()
+        free_roll.data = self.free_roll
+        self.sim_state_publisher.publish(free_roll)
 
 
 def main(args=None):

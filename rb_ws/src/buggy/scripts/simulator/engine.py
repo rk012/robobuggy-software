@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import os
 import threading
 import time
 from collections import deque
@@ -12,6 +13,7 @@ from nav_msgs.msg import Odometry
 import numpy as np
 import utm
 from util.constants import Constants
+from util.emap import EMap
 
 
 class Simulator(Node):
@@ -52,6 +54,11 @@ class Simulator(Node):
         self.declare_parameter('steering_offset', 0.0)
         self.declare_parameter('steering_offset_func', 'constant')
         self.declare_parameter('steering_offset_period', 10.0)
+        self.declare_parameter('edata', 'course_cut_square.csv')
+
+        emap_name = self.get_parameter("edata").value
+        emap_path = os.environ["EDATAPATH"] + emap_name
+        self.emap = EMap(emap_path)
 
         self.steering_offset = self.get_parameter("steering_offset").value
         self.steering_offset_func = str(self.get_parameter("steering_offset_func").value).lower()
@@ -219,7 +226,7 @@ class Simulator(Node):
         odom = Odometry()
         odom.header.stamp = time_stamp
 
-        odom_pose.position.z = float(260)
+        odom_pose.position.z = float(self.emap.elevation(odom_pose.position.x, odom_pose.position.y))
         odom_pose.orientation.z = np.deg2rad(self.heading)
 
         # variance on x and y from measurement_noise_std

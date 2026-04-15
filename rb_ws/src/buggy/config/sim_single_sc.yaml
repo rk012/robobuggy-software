@@ -2,6 +2,7 @@ SC:
   SC_sim_single:
     ros__parameters:
       pose: 'Hill1_SC'
+      edata: 'course_cut_square.csv'
       velocity: 12.0
       steering_offset: 4.0 # between 20.0 and -20.0, in degrees
       steering_offset_func: 'constant' # 'constant' or 'sin'

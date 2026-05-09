@@ -68,6 +68,7 @@ class Simulator(Node):
         self.c_rr = 0.02  # rolling resistance, const, 
         self.c_v = 0.15   # linear drag (proportional to v)
         self.c_a = 0.025  # viscous drag (proportional to v^2) 
+        self.c_s = 0.77   # steering drag (proportional to v^2 * sin^2(d) )
 
         # TODO - params to specify boundary path
         def load_json_to_utm(filepath):
@@ -226,6 +227,7 @@ class Simulator(Node):
         if self.is_freeroll:
             # gravity - assumes CoM is in back axle for now
             g = 9.807
+            # accel multiplier due to rotational kinetic energy change for non-zero steering
             M = m / (m + (I / (l*l))*(np.tan(d) ** 2))
             t = np.array([np.cos(theta), np.sin(theta)])
             dv = -M * g * np.dot(t, self.emap.grad(x, y))
@@ -233,13 +235,13 @@ class Simulator(Node):
             # friction
             f = 0
             
-            if abs(v) > 1:
-                f += self.c_rr * m * g
+            f += self.c_rr * m * g
             
             f += self.c_v * v
             f += self.c_a * v * v
+            f += self.c_s * (v ** 2) * (np.sin(d) ** 2)
 
-            dv -= f / m
+            dv -= M * (f / m)
 
         return np.array([v * np.cos(theta),
                          v * np.sin(theta),

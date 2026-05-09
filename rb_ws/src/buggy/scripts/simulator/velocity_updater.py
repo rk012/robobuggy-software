@@ -27,7 +27,7 @@ class VelocityUpdater(Node):
             self.CHECKPOINTS = (json.load(checkpoints_file))["checkpoints"]
 
         # Declare parameters with default values
-        self.declare_parameter('init_vel', 12)
+        self.declare_parameter('init_vel', 5)
         self.declare_parameter('buggy_name', 'SC')
         # Get the parameter values
         self.init_vel = self.get_parameter("init_vel").value

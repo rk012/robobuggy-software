@@ -49,7 +49,7 @@ class Simulator(Node):
             self.declare_parameter('pose', "Hill1_NAND")
             self.wheelbase = Constants.WHEELBASE_NAND
 
-        self.declare_parameter('velocity', 12.0)
+        self.declare_parameter('velocity', 5.0)
         self.velocity = self.get_parameter("velocity").value
 
         self.is_freeroll = False
@@ -63,6 +63,11 @@ class Simulator(Node):
         # TODO - set as params and/or move to constants
         self.mass = 58.967  # kg
         self.moment_of_inertia = 21.847274476  # kg, m, ellipsoid + ballpark measurement
+
+        # Friction coefficients
+        self.c_rr = 0.02  # rolling resistance, const, 
+        self.c_v = 0.15   # linear drag (proportional to v)
+        self.c_a = 0.025  # viscous drag (proportional to v^2) 
 
         # TODO - params to specify boundary path
         def load_json_to_utm(filepath):
@@ -224,6 +229,17 @@ class Simulator(Node):
             M = m / (m + (I / (l*l))*(np.tan(d) ** 2))
             t = np.array([np.cos(theta), np.sin(theta)])
             dv = -M * g * np.dot(t, self.emap.grad(x, y))
+
+            # friction
+            f = 0
+            
+            if abs(v) > 1:
+                f += self.c_rr * m * g
+            
+            f += self.c_v * v
+            f += self.c_a * v * v
+
+            dv -= f / m
 
         return np.array([v * np.cos(theta),
                          v * np.sin(theta),

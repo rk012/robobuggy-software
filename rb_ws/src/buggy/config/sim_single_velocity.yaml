@@ -1,6 +1,6 @@
 /**: # Global Params
   ros__parameters:
-      traj_name: "buggycourse_safe.json"
+      traj_name: "buggycourse_sc_opt.json"
       checkpoints_name : "buggycourse_safe_checkpoints_1.json"
 
 
@@ -21,7 +21,7 @@ SC:
 SC:
   SC_path_planner:
     ros__parameters:
-      traj_name: "buggycourse_safe.json"
+      traj_name: "buggycourse_sc_opt.json"
       curb_name: "buggycourse_curb.json"
 
 SC:

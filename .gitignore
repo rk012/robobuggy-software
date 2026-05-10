@@ -5,6 +5,8 @@ docker-compose.yml~
 *TEMP_DO_NOT_EDIT.txt
 .vscode/
 
+rb_ws/src/buggy/cached
+
 # BAGS
 rb_ws/bags
 rb_ws/src/buggy/bags/

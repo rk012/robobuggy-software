@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.interpolate import LinearNDInterpolator, RectBivariateSpline
+from scipy.ndimage import distance_transform_edt
 from matplotlib.path import Path
 
 class EMap:
@@ -77,9 +78,14 @@ class EMap:
         Z_flat[grid_mask] = lin_interp(flat_grid[grid_mask])
         Z_grid = Z_flat.reshape(X_mesh.shape)
 
-        # Flatten NaN holes to the mean track elevation
-        mean_z = np.nanmean(Z_grid)
-        Z_grid = np.nan_to_num(Z_grid, nan=mean_z)
+        # fill NaN holes
+        invalid_mask = np.isnan(Z_grid)
+        
+        # distance_transform_edt natively searches for the closest 0 in a boolean array
+        indices = distance_transform_edt(invalid_mask, return_distances=False, return_indices=True)
+
+        # 3. Overwrite the grid using the nearest valid indices
+        Z_grid = Z_grid[tuple(indices)]
 
         # 4. Fit the Spline
         print("EMap: Fitting high-speed spline...")
